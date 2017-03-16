@@ -1,0 +1,367 @@
+package com.dexter.anurag.quotesapp;
+
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
+import android.content.Intent;
+import android.graphics.Typeface;
+import android.graphics.drawable.AnimationDrawable;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.os.AsyncTask;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Vibrator;
+import android.support.v7.app.AppCompatActivity;
+import android.view.GestureDetector;
+import android.view.Gravity;
+import android.view.View;
+import android.view.animation.AnimationUtils;
+import android.widget.Button;
+import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import com.google.android.gms.ads.AdListener;
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.AdView;
+import com.google.android.gms.ads.InterstitialAd;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.Random;
+
+;
+
+public class Home extends AppCompatActivity {
+
+    private static int adFrequency =0;
+    private final String TAG="Dexter";
+    private TextView tv;
+    ImageButton copyButton;
+    private int flag=0;
+    private Button btnVar;
+    String quote; String backupQuote;
+    Random random=new Random();
+    public URL url = new URL("https://mannianurag1.000webhostapp.com");
+    private ImageView InternetErrorView;
+    public Toast toast;
+    private GestureDetector gd;
+    private AdView mAdView;
+    private InterstitialAd mInterstitialAd;
+    private ImageView mImageViewFilling;
+
+    public Home() throws MalformedURLException
+    {
+        Random r=new Random();
+        adFrequency = r.nextInt(7 - 5) + 7;
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.home_activity);
+
+
+        mInterstitialAd = new InterstitialAd(this);
+//        mInterstitialAd.setAdUnitId("ca-app-pub-3940256099942544/1033173712");  // TEST AD ID
+
+        requestNewInterstitial();
+        mInterstitialAd.setAdListener(new AdListener() {
+            public void onAdClosed() {
+                requestNewInterstitial();
+            }
+        });
+
+        requestNewInterstitial();
+
+        Typeface phoneticFont = Typeface.createFromAsset(getAssets(),"fonts/LeagueGothic-Regular.otf");
+        tv = (TextView) findViewById(R.id.textViewAutoFit);
+        tv.setTypeface(phoneticFont);
+        btnVar=(Button) findViewById(R.id.button);
+        final ImageButton imgBtn = (ImageButton) findViewById(R.id.homePageBtn);
+        final Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        InternetErrorView = (ImageView) findViewById(R.id.imageViewNoInternet);
+        InternetErrorView.setVisibility(View.GONE);
+        copyButton = (ImageButton) findViewById(R.id.copyButtonId);
+
+
+        copyButton.setVisibility(View.GONE);
+         if (isNetworkAvailable())
+        {
+            System.out.println("network avialable");
+
+            //start app with a quote displayed
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    //      Animate
+                    ImageView mImageViewFilling = (ImageView) findViewById(R.id.animation_id);
+                    mImageViewFilling.setVisibility(View.VISIBLE);
+                    ((AnimationDrawable) mImageViewFilling.getBackground()).start();
+
+                    btnVar.setClickable(false);
+                    btnVar.setBackgroundResource(R.drawable.btn_down);
+
+                    new AsyncCaller().execute();
+                    v.vibrate(100);
+                    System.out.println("r = "+quote);
+                }
+            });
+
+        }
+        else
+        {
+            ImageView mImageViewFilling = (ImageView) findViewById(R.id.animation_id);
+            mImageViewFilling.setVisibility(View.GONE);
+            System.out.println("network not avialable");
+            //internet not available
+            //hence show Internet image
+            InternetErrorView.setVisibility(View.VISIBLE);
+            copyButton.setVisibility(View.GONE);
+        }
+
+        runOnUiThread(new Runnable() {
+            public void run() {
+                btnVar.setOnClickListener(
+                        new View.OnClickListener() {
+                            public void onClick(View view) {
+
+                                System.out.println("Next btn clicked with Freq = "+adFrequency);
+                                btnVar.setBackgroundResource(R.drawable.btn_down);
+                                btnVar.setClickable(false);
+
+                                if(isNetworkAvailable()){
+                                    tv.startAnimation(AnimationUtils.loadAnimation(Home.this, R.anim.fade_out_mod));
+                                    tv.setVisibility(View.GONE);
+                                }
+
+                                copyButton.setClickable(false); v.vibrate(100);
+
+                                System.out.println("---Started execution---");
+                                if (isNetworkAvailable())
+                                {
+                                    //      Animate
+                                    ImageView mImageViewFilling = (ImageView) findViewById(R.id.animation_id);
+                                    mImageViewFilling.setVisibility(View.VISIBLE);
+                                    ((AnimationDrawable) mImageViewFilling.getBackground()).start();
+                                    //start app with a quote displayed
+                                    new AsyncCaller().execute();
+                                    InternetErrorView.setVisibility(View.GONE); //dont display error
+
+                                }
+                                else
+                                {
+                                    //internet not available
+                                    tv.setText("");
+                                    tv.setVisibility(View.GONE);
+                                    InternetErrorView.setVisibility(View.VISIBLE);
+                                    copyButton.setVisibility(View.GONE);
+                                    //((AnimationDrawable) mImageViewFilling.getBackground()).start();
+                                    // set but_up again
+                                    
+                                    Handler handler = new Handler();
+                                    Random r = new Random();
+                                    int randomTime = r.nextInt(2000 - 1000) + 2000;
+                                    handler.postDelayed(new Runnable() {
+                                        public void run() {
+                                            // Actions to do after 1 second
+                                            btnVar.setBackgroundResource(R.drawable.btn);
+                                            btnVar.setClickable(true);
+                                        }
+                                    }, randomTime);
+                                }
+                                showAd();
+                                System.out.println("r = "+quote);
+                            }
+                        }
+                );
+
+                imgBtn.setOnClickListener(
+                        new View.OnClickListener(){
+                            public void onClick(View view)
+                            {
+                                backupQuote = quote;
+                                Intent i=new Intent(Home.this,aboutUsPage.class);
+                                startActivity(i);
+                            }
+
+                            ;
+                        }
+                );
+                //copy to clipboard
+                copyButton.setOnClickListener(
+                        new View.OnClickListener() {
+                            public void onClick(View view) {
+                                ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                                if(tv.getText()!=null)
+                                {
+
+                                    ClipData clip = ClipData.newPlainText("label",tv.getText());
+                                    clipboard.setPrimaryClip(clip);
+
+                                    final Toast toast = Toast.makeText(Home.this,"Quote Copied",Toast.LENGTH_LONG);
+                                    toast.setGravity(Gravity.TOP|Gravity.CENTER_VERTICAL, 0, 0);
+                                    toast.show();
+                                    Handler handler = new Handler();
+                                    handler.postDelayed(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            toast.cancel();
+                                        }
+                                    }, 1500);
+                                }
+                            }
+                        }
+                );
+            }
+        });
+
+//////////////////////////////////////////////////// GESTURE Starts .///////////////////////////////////////////////////////////////////////////////////////////////////////
+        // initialize the Gesture Detector
+
+////////////////////////////////////////////////////////////// GESTURE ENDS .///////////////////////////////////////////////////////////////////////////////////////////////////////
+    } //onCreate ends
+
+    private void requestNewInterstitial() {
+        AdRequest adRequest = new AdRequest.Builder()
+//                .addTestDevice(AdRequest.DEVICE_ID_EMULATOR)
+//                .addTestDevice("AC98C820A50B4AD8A2106EDE96FB87D4")
+                .build();
+        mInterstitialAd.loadAd(adRequest);
+    }
+
+    private void showAd(){
+        if(adFrequency==0){
+            //now show ad
+            if (mInterstitialAd.isLoaded()) {
+                mInterstitialAd.show();
+                System.out.println("ad  loaded");
+            }
+            else {
+                System.out.println("ad not loaded");
+                ;
+            }
+            Random r=new Random();
+            adFrequency = r.nextInt(7 - 5) + 7;
+        }
+        else if(adFrequency > 0 && adFrequency < 9){
+            adFrequency--;
+        }
+        else
+        {
+            Random r=new Random();
+            adFrequency = r.nextInt(7 - 5) + 7;
+        }
+
+    }
+
+    private class AsyncCaller extends AsyncTask<Object, Object, String>
+    {
+        protected void onPreExecute() {
+            super.onPreExecute();
+            //this method will be running on UI thread
+
+
+        }
+
+        protected void onPostExecute(String result) {
+            super.onPostExecute(result);
+
+            if(result!=null && result!="Couldn't connect to Internet...") {
+                System.out.println("QUOTE == " + result);
+                quote = quote.replace("\\r","\r");
+                quote = quote.replace("\\n-", "\n\n-");
+                quote = quote.replace("\\n"," ");
+
+                System.out.println("EDITED == " + quote);
+                tv.setText(quote);
+
+                copyButton.setClickable(true);
+            }
+            else if(result == "Couldn't connect to Internet..."){
+                tv.setText(quote);
+                copyButton.setClickable(false);
+            }
+            else
+            {
+                tv.setText(" ");
+                copyButton.setClickable(false);
+            }
+            tv.setVisibility(View.VISIBLE);
+
+            tv.startAnimation(AnimationUtils.loadAnimation(Home.this, R.anim.fade_in_mod));
+            btnVar.setBackgroundResource(R.drawable.btn);
+            copyButton.setVisibility(View.VISIBLE);
+            btnVar.setClickable(true);
+
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    ImageView mImageViewFilling = (ImageView) findViewById(R.id.animation_id);
+                    ((AnimationDrawable) mImageViewFilling.getBackground()).stop();
+                    mImageViewFilling.setVisibility(View.GONE);
+                }
+            });
+        }
+
+        protected String doInBackground(Object... voids)
+        {
+            try {
+                System.out.println("========================started quote fetch");
+                BufferedReader br =new BufferedReader(new InputStreamReader(url.openStream()));
+                quote = br.readLine();
+                System.out.println("========================completed quote fetch");
+            } catch (IOException e) {
+                System.out.println("Quote fetch failed");
+                quote = "Uh..oh !\nCouldn't connect to Internet...\nCheck Signal Strength";
+            }
+            return quote;
+        }
+    }
+
+    private static final int TIME_INTERVAL = 2000; // # milliseconds, desired time passed between two back presses.
+    private long mBackPressed;
+
+    @Override
+//    exits on double tap back button
+    public void onBackPressed()
+    {
+        if (mBackPressed + TIME_INTERVAL > System.currentTimeMillis())
+        {
+            super.onBackPressed();
+            return;
+        }
+        else
+        {
+            final Toast toast = Toast.makeText(Home.this,"Press again to exit",Toast.LENGTH_SHORT);
+            toast.setGravity(Gravity.TOP|Gravity.CENTER_VERTICAL, 0, 0);
+            toast.show();
+            //handler to show toast for lesser duration than possible
+            Handler handler = new Handler();
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    toast.cancel();
+                }
+            }, 2500);
+        }
+
+        mBackPressed = System.currentTimeMillis();
+    }
+
+    private boolean isNetworkAvailable()
+    {
+        ConnectivityManager connectivityManager
+                = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+        return activeNetworkInfo != null && activeNetworkInfo.isConnected();
+    }
+
+
+}
+
